@@ -6,5 +6,6 @@ This project is the first end-to-end functional front-end implementation of a Ne
 Run 
 ```sh
 cp .env.example .env
-yarn dev
+# Need to add NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID env var.
+yarn dev 
 ```
