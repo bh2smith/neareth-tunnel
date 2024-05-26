@@ -15,6 +15,13 @@ Submitted to Infrastructure / User Experience category at ETH Berlin 2024:
 https://projects.ethberlin.org/submissions/320
 
 
+### Security & UX Feature Enhancements
+
+Two important first steps are to:
+
+1. [Use Multisig with Derived Account as Owner](https://github.com/bh2smith/neareth-tunnel/issues/2)
+2. [Add Gas Relayer Service](https://github.com/bh2smith/neareth-tunnel/issues/1)
+
 ### Disclaimer 
 
 Some of the code presented here was initially developed by our team during a pre-event workshop aimed at engaging developers to build on the Near platform. The objective was to provide the contents of this project as a primitive tooling to facilitate more innovative projects (i.e. practical use cases).
