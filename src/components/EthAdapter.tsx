@@ -116,15 +116,20 @@ export const EthAdapter = () => {
             />
             <button type='submit'>Connect</button>
       </form>
-      <button
-              style={{
-                display: txData == undefined ? 'none' : 'block'
-              }}
-              onClick={() => {triggerNearTx(txData!)}}
-              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition duration-300"
-              >
-              Send EVM Tx to Near for Signing
-            </button>
+      {txData && (
+              <>
+                <div className="bg-gray-100 p-4 rounded shadow-md w-full max-w-xl">
+                  <h2 className="text-xl font-semibold mb-2">Transaction Data</h2>
+                  <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData, null, 2)}</pre>
+                </div>
+                <button
+                  onClick={() => triggerNearTx(txData)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition duration-300"
+                >
+                  Sign on Near
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
