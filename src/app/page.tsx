@@ -1,3 +1,4 @@
+import { EthAdapter } from "@/components/EthAdapter";
 import { NearWalletConnector } from "@/components/NearWalletSelector";
 import type { Metadata } from "next";
 
@@ -17,6 +18,7 @@ export default function Home() {
                 Near Wallet Login
               </div>
               <NearWalletConnector />
+              <EthAdapter />
             </div>
           </div>
         </div>
