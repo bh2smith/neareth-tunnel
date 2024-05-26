@@ -16,6 +16,18 @@ https://projects.ethberlin.org/submissions/320
 
 Link to [Pitch Deck](https://docs.google.com/presentation/d/1dsRlUi8lC62aZKsyKFFZsIdNYKCkXPgy/edit?usp=sharing&ouid=103789527555130141695&rtpof=true&sd=true)
 
+## Successful Transaction Hashes
+
+Cow Swap Trade
+https://sepolia.etherscan.io/tx/0xf2b58ebf0490576dbd269cd822e710e9d53d842384fd30c4a99fb0d6424e4b1d
+
+Wrap ETH
+https://sepolia.etherscan.io/tx/0xe265f98fcc41336bd6b618b449ce0e5f90643cf5247394bf89f1ba4a3a9d8af8
+
+Approve 
+https://sepolia.etherscan.io/tx/0xbe5a1cc674ceede7db5ea0811739cbae22db29fedfea0b843e19eb97027edff4
+
+https://sepolia.etherscan.io/tx/0x0a85c970504ee8edfdf1d432e6237573717f9c29f718868158b7f4f998e307ca
 ### Security & UX Feature Enhancements
 
 Two important first steps are to:
