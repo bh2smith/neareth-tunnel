@@ -96,7 +96,7 @@ export const EthAdapter = () => {
     <div className="mx-6 sm:mx-24 mt-4 mb-4">
       <div className="w-full flex flex-col justify-center items-center">
         <div className="w-full flex flex-col justify-center items-center space-y-8">
-          <h1 className="text-[40px]">Basic Tx Example</h1>
+          <h1 className="text-[40px]">Connect to Dapp via Wallet Connect Below</h1>
           <div className="flex flex-col justify-center items-center space-y-4">
           </div>
           <div className='flex flex-col items-center'>
