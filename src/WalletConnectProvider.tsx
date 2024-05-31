@@ -139,7 +139,7 @@ export const WalletConnectProvider = ({
     if (!web3wallet) {
       console.error("handleRequest: web3wallet is undefined", web3wallet);
     }
-    console.log("SessionRequest", JSON.stringify(request));
+    console.log("SessionRequest from:", request.verifyContext.verified.origin);
     const txData: NearEthTxData = await adapter.handleSessionRequest(request);
     
     // Can not stringify `bigint` primitive type.
@@ -164,30 +164,33 @@ export const WalletConnectProvider = ({
       await initializeWallet()
       console.warn("respondRequest: Should now be defined!", web3wallet);
     }
-    console.log("Got all the sheet");
+    console.log("Got all the sheet, attempting to retreive signature");
     // Retrieve (r, s) values for ECDSA signature (from Near TxReceipt)
-    console.log(nearTxHash)
-    
-    const {big_r, big_s} = await signatureFromTxHash(
-      "https://rpc.testnet.near.org",
-      nearTxHash
-    );
-    console.log("retrieved signature from Near MPC Contract", big_r, big_s);
-    const signature = await adapter.recoverSignature(txData.recoveryData, {big_r, big_s});
-
-    console.log("Recovered Hex Signature", signature)
-    await web3wallet!.respondSessionRequest({
-      topic: request.topic,
-      response: {
-        id: request.id,
-        jsonrpc: "2.0",
-        result: signature,
-      },
-    });
-    // // Remove Local storage related to this.
-    localStorage.removeItem("wc-request");
-    localStorage.removeItem("txData");
-    console.log("HORRAY! EVM Signature", signature);
+    try {
+      const {big_r, big_s} = await signatureFromTxHash(
+        "https://rpc.testnet.near.org",
+        nearTxHash
+      );
+      console.log("retrieved signature from Near MPC Contract", big_r, big_s);
+      const signature = await adapter.recoverSignature(txData.recoveryData, {big_r, big_s});
+  
+      console.log("Recovered Hex Signature", signature)
+      await web3wallet!.respondSessionRequest({
+        topic: request.topic,
+        response: {
+          id: request.id,
+          jsonrpc: "2.0",
+          result: signature,
+        },
+      });
+      // // Remove Local storage related to this.
+      localStorage.removeItem("wc-request");
+      localStorage.removeItem("txData");
+      console.log("HORRAY! EVM Signature", signature);
+    } catch (error: unknown) {
+      console.warn(`Couldn't retreive signature from Near for TX ${nearTxHash}:`, error)
+      console.log(`https://testnet.nearblocks.io/txns/${nearTxHash}`)
+    }
   };
 
   return (
