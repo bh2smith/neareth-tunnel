@@ -6,6 +6,7 @@ import { NearEthTxData, useWalletConnect } from "@/WalletConnectProvider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { NearEthAdapter } from "near-ca";
 import { initializeAdapter } from "@/utils/adapter";
+// import { getSdkError } from "@walletconnect/utils";
 
 export const EthAdapter = () => {
   const router = useRouter();
@@ -38,11 +39,27 @@ export const EthAdapter = () => {
       setAdapter(adapter)
     }
   }, [adapter, selector]);
+
+  // const handleSessionDelete = useCallback(async () => {      
+  //   if (!web3wallet) {
+  //     console.log("Now web3wallet")
+  //     return;
+  //   }
+  //   const sessions = web3wallet.getActiveSessions();
+  //   for (const key in sessions) {
+  //     console.log("Disconnecting Session", sessions[key]);
+  //     const topic = sessions[key].pairingTopic;
+  //     await web3wallet!.disconnectSession({
+  //       topic,
+  //       reason: getSdkError('USER_DISCONNECTED')
+  //     })
+  //   }
+  // }, [web3wallet]);
   
   useEffect(() => {
     if (web3wallet && adapter) {
       const handleSessionProposal = async (request: Web3WalletTypes.SessionProposal) => {
-        console.log("Received session_proposal");
+        console.log("Received session_proposal", request);
         onSessionProposal(request, adapter!);
       };
       const handleSessionRequest = async (request: Web3WalletTypes.SessionRequest) => {
@@ -56,9 +73,11 @@ export const EthAdapter = () => {
       };
       web3wallet.on("session_proposal", handleSessionProposal);
       web3wallet.on("session_request", handleSessionRequest);
+      // web3wallet.on("session_delete", handleSessionDelete);
       return () => {
         web3wallet.off("session_proposal", handleSessionProposal);
         web3wallet.off("session_request", handleSessionRequest);
+        // web3wallet.off("session_delete", handleSessionDelete);
       };
     }
   }, [web3wallet, handleRequest, onSessionProposal, triggerNearTx, adapter]);
@@ -91,6 +110,33 @@ export const EthAdapter = () => {
     };
     handleRequestResponse();
   }, [transactionHashes, respondRequest, router, adapter, connectEvm]);
+
+  const rejectRequest = async () => {      
+    console.log("Rejecting Request");
+    const requestString = localStorage.getItem("wc-request");
+    const request = JSON.parse(requestString!) as Web3WalletTypes.SessionRequest;
+    try {
+      await web3wallet!.respondSessionRequest({
+        topic: request.topic,
+        response: {
+          id: request.id,
+          jsonrpc: "2.0",
+          error: {
+            code: 5000,
+            message: 'User rejected.'
+          },
+        },
+      });
+    } catch (error: unknown) {
+      console.warn("Failed to reject - clearing relevant local storage anyway", error);
+    }
+    // // Remove Local storage related to this.
+    setTxData(undefined)
+    localStorage.removeItem("wc-request");
+    localStorage.removeItem("txData");
+  };
+
+
 
   return (
     <div className="mx-6 sm:mx-24 mt-4 mb-4">
@@ -136,6 +182,12 @@ export const EthAdapter = () => {
                   <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData, null, 2)}</pre>
                 </div>
                 <button
+                  onClick={() => rejectRequest()}
+                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition duration-300"
+                >
+                  Reject Tx
+                </button>
+                <button
                   onClick={() => triggerNearTx(txData)}
                   className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition duration-300"
                 >
@@ -149,3 +201,4 @@ export const EthAdapter = () => {
     </div>
   );
 };
+// 

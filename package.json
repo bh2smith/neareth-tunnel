@@ -22,6 +22,7 @@
   },
   "dependencies": {
     "@mintbase-js/react": "0.5.4-beta.0",
+    "@walletconnect/utils": "^2.13.1",
     "near-ca": "^0.0.9",
     "next": "14.0.1",
     "react": "^18",
