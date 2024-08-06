@@ -48,9 +48,7 @@ export const EthAdapter = () => {
       const handleSessionRequest = async (request: Web3WalletTypes.SessionRequest) => {
         console.log("Received session_request", request);
         const txData = await handleRequest(request, adapter);
-        if (!txData) {
-          return;
-        }
+        localStorage.setItem("txData", JSON.stringify(txData));
         setTxData(txData)
       };
       web3wallet.on("session_proposal", handleSessionProposal);
@@ -72,15 +70,19 @@ export const EthAdapter = () => {
       if (transactionHashes) {
         const nearTxHash = Array.isArray(transactionHashes) ? transactionHashes[0] : transactionHashes;
         console.log('Near Tx Hash from URL:', nearTxHash);
+        let txDataString = localStorage.getItem("txData");
         const requestString = localStorage.getItem("wc-request");
-        if (!requestString) {
-          console.error("request not in local storage!");
+        if (!txDataString || !requestString) {
+          console.error("one of txData or request is not in local storage!");
           return;
         }
+        const tx = JSON.parse(txDataString) as NearEthTxData;
         const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
+        localStorage.removeItem("wc-request");
+        localStorage.removeItem("txData");
         try {
-          await respondRequest(request, nearTxHash);
           setTxData(undefined)
+          await respondRequest(request, tx, nearTxHash);
           router.replace(window.location.pathname);
         } catch (error) {
           console.error("Error responding to request:", error);

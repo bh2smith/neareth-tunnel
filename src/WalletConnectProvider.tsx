@@ -2,9 +2,9 @@
 import { Core } from "@walletconnect/core";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearEthTxData, NearEthAdapter, signatureFromTxHash } from "near-ca";
+import { NearEthTxData, NearEthAdapter, signatureFromTxHash, addSignature, Network } from "near-ca";
 import React, { createContext, useContext, useState } from "react";
-import { serializeSignature, serializeTransaction } from "viem";
+import { keccak256, parseTransaction, serializeSignature, serializeTransaction } from "viem";
 
 
 interface WalletContextType {
@@ -13,6 +13,7 @@ interface WalletContextType {
   handleRequest: (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter) => Promise<NearEthTxData | undefined>;
   respondRequest: (
     request: Web3WalletTypes.SessionRequest,
+    txData: NearEthTxData,
     nearTxHash: string,
   ) => Promise<void>;
   onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => void;
@@ -36,7 +37,6 @@ export const WalletConnectProvider = ({
   const [web3wallet, setWeb3Wallet] = useState<InstanceType<
     typeof Web3Wallet
   > | null>(null);
-  // const [adapter, setAdapter] = useState<NearEthAdapter>();
 
   const initializeWallet = async (uri?: string) => {
     const core = new Core({
@@ -46,9 +46,9 @@ export const WalletConnectProvider = ({
     const web3wallet = await Web3Wallet.init({
       core,
       metadata: {
-        name: "Mintbase Wallet",
+        name: "Bitte Wallet by Mintbase",
         description: "Near Wallet Connect to EVM.",
-        url: "wallet.mintbase.xyz",
+        url: "wallet.bitte.ai",
         icons: [],
       },
     });
@@ -132,7 +132,7 @@ export const WalletConnectProvider = ({
       console.error("handleRequest: web3wallet is undefined", web3wallet);
     }
     console.log("SessionRequest", JSON.stringify(request));
-    const txData: NearEthTxData = await adapter.handleSessionRequest(request);
+    const txData = await adapter.handleSessionRequest(request);
     
     // Can not stringify `bigint` primitive type.
     if (!(typeof txData.evmMessage === "string")) {
@@ -143,8 +143,10 @@ export const WalletConnectProvider = ({
 
   const respondRequest = async (
     request: Web3WalletTypes.SessionRequest, 
+    txData: NearEthTxData,
     nearTxHash: string,
   ) => {
+    const {recoveryData} = txData;
     console.log("Responding to request", request, nearTxHash);
     if (!web3wallet) {
       console.warn("respondRequest: web3wallet undefined", web3wallet);
@@ -157,16 +159,30 @@ export const WalletConnectProvider = ({
       nearTxHash
     );
     console.log("retrieved signature from Near MPC Contract", signature);
-    localStorage.removeItem("wc-request");
+    let result = serializeSignature(signature);
+    // Update near-ca after: https://github.com/Mintbase/near-ca/pull/89
+    if (request.params.request.method === "eth_sendTransaction") {
+      const serializedTransaction = addSignature({
+        transaction: recoveryData.data as `0x${string}`,
+        signature,
+      });
+      // Returns relayed transaction hash (without waiting for confirmation).
+      const tx = parseTransaction(serializedTransaction);
+      const network = Network.fromChainId(tx.chainId!);
+      network.client.sendRawTransaction({
+        serializedTransaction,
+      });
+      result = keccak256(serializedTransaction);
+    }
     await web3wallet!.respondSessionRequest({
       topic: request.topic,
       response: {
         id: request.id,
         jsonrpc: "2.0",
-        result: serializeSignature(signature),
+        result,
       },
     });
-    
+    console.log("Responded to request!");
   };
 
   return (
