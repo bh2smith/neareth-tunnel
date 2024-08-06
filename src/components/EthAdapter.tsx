@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useMbWallet } from "@mintbase-js/react";
 import { Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearEthTxData, useWalletConnect } from "@/WalletConnectProvider";
+import { useWalletConnect } from "@/WalletConnectProvider";
 import { useRouter, useSearchParams } from "next/navigation";
-import { NearEthAdapter } from "near-ca";
+import { NearEthAdapter, NearEthTxData } from "near-ca";
 import { initializeAdapter } from "@/utils/adapter";
 
 export const EthAdapter = () => {
@@ -50,9 +50,6 @@ export const EthAdapter = () => {
         const txData = await handleRequest(request, adapter);
         localStorage.setItem("txData", JSON.stringify(txData));
         setTxData(txData)
-        if (!txData) {
-          return;
-        }
       };
       web3wallet.on("session_proposal", handleSessionProposal);
       web3wallet.on("session_request", handleSessionRequest);
@@ -76,13 +73,16 @@ export const EthAdapter = () => {
         let txDataString = localStorage.getItem("txData");
         const requestString = localStorage.getItem("wc-request");
         if (!txDataString || !requestString) {
-          console.error("One of TxData or request not in local storage!");
+          console.error("one of txData or request is not in local storage!");
           return;
         }
-        const txData = JSON.parse(txDataString) as NearEthTxData;
+        const tx = JSON.parse(txDataString) as NearEthTxData;
         const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
+        localStorage.removeItem("wc-request");
+        localStorage.removeItem("txData");
         try {
-          await respondRequest(request, txData, nearTxHash, adapter!);
+          setTxData(undefined)
+          await respondRequest(request, tx, nearTxHash);
           router.replace(window.location.pathname);
         } catch (error) {
           console.error("Error responding to request:", error);
