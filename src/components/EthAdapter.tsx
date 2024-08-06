@@ -2,9 +2,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { useMbWallet } from "@mintbase-js/react";
 import { Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearEthTxData, useWalletConnect } from "@/WalletConnectProvider";
+import { useWalletConnect } from "@/WalletConnectProvider";
 import { useRouter, useSearchParams } from "next/navigation";
-import { NearEthAdapter } from "near-ca";
+import { NearEthAdapter, NearEthTxData } from "near-ca";
 import { initializeAdapter } from "@/utils/adapter";
 
 export const EthAdapter = () => {
@@ -48,11 +48,10 @@ export const EthAdapter = () => {
       const handleSessionRequest = async (request: Web3WalletTypes.SessionRequest) => {
         console.log("Received session_request", request);
         const txData = await handleRequest(request, adapter);
-        localStorage.setItem("txData", JSON.stringify(txData));
-        setTxData(txData)
         if (!txData) {
           return;
         }
+        setTxData(txData)
       };
       web3wallet.on("session_proposal", handleSessionProposal);
       web3wallet.on("session_request", handleSessionRequest);
@@ -73,16 +72,15 @@ export const EthAdapter = () => {
       if (transactionHashes) {
         const nearTxHash = Array.isArray(transactionHashes) ? transactionHashes[0] : transactionHashes;
         console.log('Near Tx Hash from URL:', nearTxHash);
-        let txDataString = localStorage.getItem("txData");
         const requestString = localStorage.getItem("wc-request");
-        if (!txDataString || !requestString) {
-          console.error("One of TxData or request not in local storage!");
+        if (!requestString) {
+          console.error("request not in local storage!");
           return;
         }
-        const txData = JSON.parse(txDataString) as NearEthTxData;
         const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
         try {
-          await respondRequest(request, txData, nearTxHash, adapter!);
+          await respondRequest(request, nearTxHash);
+          setTxData(undefined)
           router.replace(window.location.pathname);
         } catch (error) {
           console.error("Error responding to request:", error);

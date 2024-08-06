@@ -1,5 +1,5 @@
 {
-  "name": "NearETHTunnel",
+  "name": "neareth-tunnel",
   "version": "0.1.0",
   "keywords": [
     "templates",
@@ -22,12 +22,13 @@
   },
   "dependencies": {
     "@mintbase-js/react": "0.5.4-beta.0",
-    "near-ca": "^0.0.9",
+    "near-ca": "^0.2.5",
     "next": "14.0.1",
     "react": "^18",
     "react-dom": "^18",
     "react-github-btn": "^1.4.0",
-    "react-share": "^5.1.0"
+    "react-share": "^5.1.0",
+    "viem": "^2.18.8"
   },
   "devDependencies": {
     "@types/node": "^20",

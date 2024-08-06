@@ -2,25 +2,18 @@
 import { Core } from "@walletconnect/core";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearContractFunctionPayload, NearEthAdapter, RecoveryData, signatureFromTxHash } from "near-ca";
+import { NearEthTxData, NearEthAdapter, signatureFromTxHash } from "near-ca";
 import React, { createContext, useContext, useState } from "react";
-import { TransactionSerializable, serializeTransaction } from "viem";
+import { serializeSignature, serializeTransaction } from "viem";
 
-export interface NearEthTxData {
-  evmMessage: string | TransactionSerializable;
-  nearPayload: NearContractFunctionPayload;
-  recoveryData: RecoveryData;
-}
 
 interface WalletContextType {
   web3wallet: InstanceType<typeof Web3Wallet> | null;
   initializeWallet: (uri: string) => void;
   handleRequest: (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter) => Promise<NearEthTxData | undefined>;
   respondRequest: (
-    request: Web3WalletTypes.SessionRequest, 
-    txData: NearEthTxData, 
+    request: Web3WalletTypes.SessionRequest,
     nearTxHash: string,
-    adapter: NearEthAdapter
   ) => Promise<void>;
   onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => void;
 }
@@ -80,7 +73,6 @@ export const WalletConnectProvider = ({
       console.warn("No web3wallet available: can not respond to session_proposal");
       return;
     }
-    console.log("Respond to Session Proposal")
     const supportedChainIds = [1, 100, 11155111];
     // TODO - This big gross thing could live in near-ca:
     // cf: https://github.com/Mintbase/near-ca/issues/47
@@ -146,48 +138,35 @@ export const WalletConnectProvider = ({
     if (!(typeof txData.evmMessage === "string")) {
       txData.evmMessage = serializeTransaction(txData.evmMessage);
     }
-    console.log("Setting TX Data! Yay");
-    localStorage.setItem("txData", JSON.stringify(txData))
-    console.log("txData set", txData)
     return txData;
   };
 
   const respondRequest = async (
     request: Web3WalletTypes.SessionRequest, 
-    txData: NearEthTxData, 
     nearTxHash: string,
-    adapter: NearEthAdapter,
   ) => {
-    console.log("Responding to request", request, txData, nearTxHash);
+    console.log("Responding to request", request, nearTxHash);
     if (!web3wallet) {
       console.warn("respondRequest: web3wallet undefined", web3wallet);
       await initializeWallet()
       console.warn("respondRequest: Should now be defined!", web3wallet);
     }
-    console.log("Got all the sheet");
-    // Retrieve (r, s) values for ECDSA signature (from Near TxReceipt)
-    console.log(nearTxHash)
     
-    const {big_r, big_s} = await signatureFromTxHash(
+    const signature = await signatureFromTxHash(
       "https://rpc.testnet.near.org",
       nearTxHash
     );
-    console.log("retrieved signature from Near MPC Contract", big_r, big_s);
-    const signature = await adapter.recoverSignature(txData.recoveryData, {big_r, big_s});
-
-    console.log("Recovered Hex Signature", signature)
+    console.log("retrieved signature from Near MPC Contract", signature);
+    localStorage.removeItem("wc-request");
     await web3wallet!.respondSessionRequest({
       topic: request.topic,
       response: {
         id: request.id,
         jsonrpc: "2.0",
-        result: signature,
+        result: serializeSignature(signature),
       },
     });
-    // // Remove Local storage related to this.
-    localStorage.removeItem("wc-request");
-    localStorage.removeItem("txData");
-    console.log("HORRAY! EVM Signature", signature);
+    
   };
 
   return (
