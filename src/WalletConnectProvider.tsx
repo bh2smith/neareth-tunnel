@@ -2,9 +2,9 @@
 import { Core } from "@walletconnect/core";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearEthTxData, NearEthAdapter, signatureFromTxHash, addSignature, Network } from "near-ca";
+import { NearEthTxData, NearEthAdapter, signatureFromTxHash, getNetworkId, configFromNetworkId } from "near-ca";
 import React, { createContext, useContext, useState } from "react";
-import { keccak256, parseTransaction, serializeSignature, serializeTransaction } from "viem";
+import { serializeTransaction } from "viem";
 
 
 interface WalletContextType {
@@ -15,7 +15,9 @@ interface WalletContextType {
     request: Web3WalletTypes.SessionRequest,
     txData: NearEthTxData,
     nearTxHash: string,
+    adapter: NearEthAdapter,
   ) => Promise<void>;
+  // rejectRequest: (request: Web3WalletTypes.SessionRequest) => void;
   onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => void;
 }
 
@@ -132,7 +134,7 @@ export const WalletConnectProvider = ({
       console.error("handleRequest: web3wallet is undefined", web3wallet);
     }
     console.log("SessionRequest", JSON.stringify(request));
-    const txData = await adapter.handleSessionRequest(request);
+    const txData = await adapter.beta.handleSessionRequest(request);
     
     // Can not stringify `bigint` primitive type.
     if (!(typeof txData.evmMessage === "string")) {
@@ -145,44 +147,34 @@ export const WalletConnectProvider = ({
     request: Web3WalletTypes.SessionRequest, 
     txData: NearEthTxData,
     nearTxHash: string,
+    adapter: NearEthAdapter,
   ) => {
-    const {recoveryData} = txData;
     console.log("Responding to request", request, nearTxHash);
     if (!web3wallet) {
       console.warn("respondRequest: web3wallet undefined", web3wallet);
       await initializeWallet()
       console.warn("respondRequest: Should now be defined!", web3wallet);
     }
-    
+    const nearConfig = configFromNetworkId(getNetworkId(adapter.nearAccountId()));
     const signature = await signatureFromTxHash(
-      "https://rpc.testnet.near.org",
+      nearConfig.nodeUrl,      
       nearTxHash
     );
     console.log("retrieved signature from Near MPC Contract", signature);
-    let result = serializeSignature(signature);
-    // Update near-ca after: https://github.com/Mintbase/near-ca/pull/89
-    if (request.params.request.method === "eth_sendTransaction") {
-      const serializedTransaction = addSignature({
-        transaction: recoveryData.data as `0x${string}`,
-        signature,
+    try {
+      await web3wallet!.respondSessionRequest({
+        topic: request.topic,
+        response: {
+          id: request.id,
+          jsonrpc: "2.0",
+          result: await adapter.beta.respondSessionRequest(txData.recoveryData, signature),
+        },
       });
-      // Returns relayed transaction hash (without waiting for confirmation).
-      const tx = parseTransaction(serializedTransaction);
-      const network = Network.fromChainId(tx.chainId!);
-      network.client.sendRawTransaction({
-        serializedTransaction,
-      });
-      result = keccak256(serializedTransaction);
+      console.log("Responded to request!");
+    } catch (error: unknown) {
+      console.log()
     }
-    await web3wallet!.respondSessionRequest({
-      topic: request.topic,
-      response: {
-        id: request.id,
-        jsonrpc: "2.0",
-        result,
-      },
-    });
-    console.log("Responded to request!");
+    
   };
 
   return (
@@ -192,6 +184,7 @@ export const WalletConnectProvider = ({
         initializeWallet,
         handleRequest,
         respondRequest,
+        // rejectRequest,
         onSessionProposal,
       }}
     >
