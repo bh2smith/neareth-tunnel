@@ -1,23 +1,14 @@
 "use client";
 import { Core } from "@walletconnect/core";
-import { buildApprovedNamespaces } from "@walletconnect/utils";
-import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearEthTxData, NearEthAdapter, signatureFromTxHash, getNetworkId, configFromNetworkId } from "near-ca";
+import Web3Wallet, { Web3WalletTypes } from "@walletconnect/web3wallet";
+import { NearEthTxData, NearEthAdapter } from "near-ca";
 import React, { createContext, useCallback, useContext, useState } from "react";
-import { Hex, serializeTransaction } from "viem";
-import { supportedNamespaces } from "./utils/constants";
 
 
 interface WalletContextType {
   web3wallet: InstanceType<typeof Web3Wallet> | null;
-  initializeWallet: (uri: string) => void;
+  initializeWallet: (uri?: string) => Promise<void>;
   handleRequest: (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter) => Promise<NearEthTxData | undefined>;
-  respondRequest: (
-    request: Web3WalletTypes.SessionRequest,
-    nearTxHash: string,
-    adapter: NearEthAdapter,
-    recovery?: Hex,
-  ) => Promise<void>;
   onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => void;
 }
 
@@ -55,7 +46,6 @@ export const WalletConnectProvider = ({
       },
     });
     setWeb3Wallet(web3wallet);
-    
     // Attempt to pair using the provided URI
     if (uri) {
       try {
@@ -66,61 +56,19 @@ export const WalletConnectProvider = ({
     }
   };
 
-  const onSessionProposal = useCallback(async ({
-    id,
-    params, 
-    // verifyContext,
-  }: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => {
+  const onSessionProposal = useCallback(async (proposal: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => {
     if (!web3wallet) {
       console.warn("No web3wallet available: can not respond to session_proposal");
       return;
     }
-    
-    await web3wallet.approveSession({
-      id: id,
-      namespaces: buildApprovedNamespaces({
-        proposal: params,
-        supportedNamespaces: supportedNamespaces(adapter.address)
-      }),
-    });
-    console.log(`Connected to ${params.proposer.metadata.name}`);
+    const response = await adapter.beta.approveSession(web3wallet, proposal);
+    console.log(`Connected to ${proposal.params.proposer.metadata.name}`);
+    console.log(`SessionApproval Response ${response}`);
   }, [web3wallet]);
 
   const handleRequest = useCallback(async (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter): Promise<NearEthTxData | undefined> => {
-    const txData = await adapter.beta.handleSessionRequest(request);
-    if (!(typeof txData.evmMessage === "string")) {
-      // Can not stringify `bigint` primitive type.
-      txData.evmMessage = serializeTransaction(txData.evmMessage);
-    }
-    return txData;
+    return adapter.beta.handleSessionRequest(request);
   }, []);
-
-  const respondRequest = useCallback(async (
-    request: Web3WalletTypes.SessionRequest,
-    nearTxHash: string,
-    adapter: NearEthAdapter,
-    recovery?: Hex
-  ) => {
-    console.log("Responding to request with txHash", request, nearTxHash);
-    if (!web3wallet) {
-      return;
-    }
-    const nearConfig = configFromNetworkId(getNetworkId(adapter.nearAccountId()));
-    const signature = await signatureFromTxHash(
-      nearConfig.nodeUrl,      
-      nearTxHash
-    );
-    const result = await adapter.beta.respondSessionRequest(signature, recovery);
-    console.log("retrieved signature from Near MPC Contract, responding with", result);
-    await web3wallet.respondSessionRequest({
-      topic: request.topic,
-      response: {
-        id: request.id,
-        jsonrpc: "2.0",
-        result,
-      },
-    });
-  }, [web3wallet]);
 
   return (
     <WalletContext.Provider
@@ -128,7 +76,6 @@ export const WalletConnectProvider = ({
         web3wallet,
         initializeWallet,
         handleRequest,
-        respondRequest,
         onSessionProposal,
       }}
     >

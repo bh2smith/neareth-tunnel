@@ -16,7 +16,7 @@ export const EthAdapter = () => {
   const [txData, setTxData] = useState<NearEthTxData>();
   const [request, setRequest] = useState<Web3WalletTypes.SessionRequest>();
   const [adapter, setAdapter] = useState<NearEthAdapter>();
-  const { initializeWallet, web3wallet, handleRequest, onSessionProposal, respondRequest } = useWalletConnect();
+  const { initializeWallet, web3wallet, handleRequest, onSessionProposal } = useWalletConnect();
   const { selector } = useMbWallet();
 
   const triggerNearTx = useCallback(async (txData: NearEthTxData) => {
@@ -76,10 +76,10 @@ export const EthAdapter = () => {
 
   useEffect(() => {
     const handleRequestResponse = async () => {
-      if (!adapter) { 
-        await connectEvm();
+      if (!adapter || !web3wallet) { 
+        await Promise.all([connectEvm(), initializeWallet()]);
       };
-      if (transactionHashes) {
+      if (transactionHashes && web3wallet && adapter) {
         const nearTxHash = Array.isArray(transactionHashes) ? transactionHashes[0] : transactionHashes;
         console.log('Near Tx Hash from URL:', nearTxHash);
         const requestString = localStorage.getItem("wc-request");
@@ -90,7 +90,12 @@ export const EthAdapter = () => {
         }
         const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
         try {
-          await respondRequest(request, nearTxHash, adapter!, recovery);
+          await adapter.beta.respondSessionRequest(
+            web3wallet,
+            request,
+            nearTxHash,
+            recovery
+          )
           console.log("Responded request and cleared state")
           localStorage.removeItem("wc-request");
           localStorage.removeItem("recovery");
@@ -98,10 +103,12 @@ export const EthAdapter = () => {
         } catch (error) {
           console.error("Error responding to request:", error);
         }
+      } else {
+        console.warn(`Missing one of ${transactionHashes}, ${web3wallet} or ${adapter}`)
       }
     };
     handleRequestResponse();
-  }, [transactionHashes, respondRequest, router, adapter, connectEvm]);
+  }, [web3wallet, initializeWallet, transactionHashes, router, adapter, connectEvm]);
 
   const rejectRequest = (request: Web3WalletTypes.SessionRequest): void => {
     if (!web3wallet) {
@@ -166,7 +173,7 @@ export const EthAdapter = () => {
               <>
                 <div className="bg-gray-900 p-4 rounded shadow-md w-full max-w-xl">
                   <h2 className="text-xl font-semibold mb-5">Transaction Data</h2>
-                  <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData, null, 2)}</pre>
+                  <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData.evmMessage, null, 2)}</pre>
                 </div>
                 <button
                   onClick={() => triggerNearTx(txData)}
