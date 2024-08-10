@@ -5,6 +5,7 @@ import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
 import { NearEthTxData, NearEthAdapter, signatureFromTxHash, getNetworkId, configFromNetworkId } from "near-ca";
 import React, { createContext, useContext, useState } from "react";
 import { serializeTransaction } from "viem";
+import { supportedNamespaces } from "./utils/constants";
 
 
 interface WalletContextType {
@@ -13,11 +14,9 @@ interface WalletContextType {
   handleRequest: (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter) => Promise<NearEthTxData | undefined>;
   respondRequest: (
     request: Web3WalletTypes.SessionRequest,
-    txData: NearEthTxData,
     nearTxHash: string,
     adapter: NearEthAdapter,
   ) => Promise<void>;
-  // rejectRequest: (request: Web3WalletTypes.SessionRequest) => void;
   onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => void;
 }
 
@@ -75,67 +74,22 @@ export const WalletConnectProvider = ({
       console.warn("No web3wallet available: can not respond to session_proposal");
       return;
     }
-    const supportedChainIds = [1, 100, 11155111];
-    // TODO - This big gross thing could live in near-ca:
-    // cf: https://github.com/Mintbase/near-ca/issues/47
-    const approvedNamespaces = buildApprovedNamespaces({
-      proposal: params,
-      supportedNamespaces: {
-        eip155: {
-          chains: supportedChainIds.map((id) => `eip155:${id}`),
-          methods: [
-            // "eth_accounts",
-            // "eth_requestAccounts",
-            "eth_sendRawTransaction",
-            "eth_sign",
-            "eth_signTransaction",
-            "eth_signTypedData",
-            "eth_signTypedData_v3",
-            "eth_signTypedData_v4",
-            "eth_sendTransaction",
-            "personal_sign",
-            // "wallet_switchEthereumChain",
-            // "wallet_addEthereumChain",
-            // "wallet_getPermissions",
-            // "wallet_requestPermissions",
-            // "wallet_registerOnboarding",
-            // "wallet_watchAsset",
-            // "wallet_scanQRCode",
-            // "wallet_sendCalls",
-            // "wallet_getCallsStatus",
-            // "wallet_showCallsStatus",
-            // "wallet_getCapabilities",
-          ],
-          events: [
-            "chainChanged",
-            "accountsChanged",
-            "message",
-            "disconnect",
-            "connect",
-          ],
-          accounts: supportedChainIds.map(
-            (id) => `eip155:${id}:${adapter.address}`
-          ),
-        },
-      },
-    });
+    
     await web3wallet.approveSession({
       id: id,
-      namespaces: approvedNamespaces,
+      namespaces: buildApprovedNamespaces({
+        proposal: params,
+        supportedNamespaces: supportedNamespaces(adapter.address)
+      }),
     });
-    console.log("Connected!");
-    // web3wallet!.on("session_request", handleRequest);
+    console.log(`Connected to ${params.proposer.metadata.name}`);
   };
 
   const handleRequest = async (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter): Promise<NearEthTxData | undefined> => {
-    // set wc-request to storage (it will be lost after signing)
-    localStorage.setItem("wc-request", JSON.stringify(request));
     if (!web3wallet) {
       console.error("handleRequest: web3wallet is undefined", web3wallet);
     }
-    console.log("SessionRequest", JSON.stringify(request));
     const txData = await adapter.beta.handleSessionRequest(request);
-    
     // Can not stringify `bigint` primitive type.
     if (!(typeof txData.evmMessage === "string")) {
       txData.evmMessage = serializeTransaction(txData.evmMessage);
@@ -145,7 +99,6 @@ export const WalletConnectProvider = ({
 
   const respondRequest = async (
     request: Web3WalletTypes.SessionRequest, 
-    txData: NearEthTxData,
     nearTxHash: string,
     adapter: NearEthAdapter,
   ) => {
@@ -161,20 +114,21 @@ export const WalletConnectProvider = ({
       nearTxHash
     );
     console.log("retrieved signature from Near MPC Contract", signature);
+    const { recoveryData } = await adapter.beta.handleSessionRequest(request);
+    const result = await adapter.beta.respondSessionRequest(recoveryData, signature);
     try {
       await web3wallet!.respondSessionRequest({
         topic: request.topic,
         response: {
           id: request.id,
           jsonrpc: "2.0",
-          result: await adapter.beta.respondSessionRequest(txData.recoveryData, signature),
+          result,
         },
       });
       console.log("Responded to request!");
     } catch (error: unknown) {
-      console.log()
+      console.log(`respondRequest error ${error}`)
     }
-    
   };
 
   return (
@@ -184,7 +138,6 @@ export const WalletConnectProvider = ({
         initializeWallet,
         handleRequest,
         respondRequest,
-        // rejectRequest,
         onSessionProposal,
       }}
     >
