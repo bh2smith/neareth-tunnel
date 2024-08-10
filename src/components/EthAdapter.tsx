@@ -6,26 +6,24 @@ import { useWalletConnect } from "@/WalletConnectProvider";
 import { useRouter, useSearchParams } from "next/navigation";
 import { NearEthAdapter, NearEthTxData } from "near-ca";
 import { initializeAdapter } from "@/utils/adapter";
+import { Hex } from "viem";
 
 export const EthAdapter = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const transactionHashes = searchParams?.get('transactionHashes');
-  const txDataString = searchParams?.get('txData');
   const [uri, setUri] = useState("");
   const [txData, setTxData] = useState<NearEthTxData>();
   const [request, setRequest] = useState<Web3WalletTypes.SessionRequest>();
   const [adapter, setAdapter] = useState<NearEthAdapter>();
-  const { initializeWallet, web3wallet, handleRequest, onSessionProposal, respondRequest } = useWalletConnect();
+  const { initializeWallet, web3wallet, handleRequest, onSessionProposal } = useWalletConnect();
   const { selector } = useMbWallet();
 
   const triggerNearTx = useCallback(async (txData: NearEthTxData) => {
     try {
       const wallet = await selector.wallet();
-        console.log("Triggering Near Tx on wallet", txData, wallet);
         wallet.signAndSendTransaction({
           ...txData.nearPayload,
-          callbackUrl: `http://localhost:3000?txData=${JSON.stringify(txData)}`
         });
     } catch (err: unknown) {
       console.error("Cannot connect to EVM without Near wallet connection!", (err as Error).message);
@@ -53,11 +51,15 @@ export const EthAdapter = () => {
       };
       const handleSessionRequest = async (request: Web3WalletTypes.SessionRequest) => {
         console.log("Received session_request", request);
-        const txData = await handleRequest(request, adapter);
-        localStorage.setItem("txData", JSON.stringify(txData));
-        setTxData(txData)
+        localStorage.setItem("wc-request", JSON.stringify(request));
+        const tx = await handleRequest(request, adapter);
+        // Cheeky Hack.
+        if (tx?.recoveryData.type === "eth_sendTransaction") {
+          localStorage.setItem("recovery", tx.recoveryData.data as `0x${string}`);
+        }
         setRequest(request)
-        console.log("set txData in local storage and state");
+        setTxData(tx)
+        console.log("set request, txData & [recovery]");
       };
       web3wallet.on("session_proposal", handleSessionProposal);
       web3wallet.on("session_request", handleSessionRequest);
@@ -74,33 +76,39 @@ export const EthAdapter = () => {
 
   useEffect(() => {
     const handleRequestResponse = async () => {
-      if (!adapter) { 
-        await connectEvm();
+      if (!adapter || !web3wallet) { 
+        await Promise.all([connectEvm(), initializeWallet()]);
       };
-      if (transactionHashes && txDataString) {
+      if (transactionHashes && web3wallet && adapter) {
         const nearTxHash = Array.isArray(transactionHashes) ? transactionHashes[0] : transactionHashes;
         console.log('Near Tx Hash from URL:', nearTxHash);
         const requestString = localStorage.getItem("wc-request");
+        const recovery = localStorage.getItem("recovery") as (Hex | undefined);
         if (!requestString) {
-          console.error("one of txData or request is not in local storage!", requestString);
+          console.error("missing requestString!", requestString);
           return;
         }
-        const tx = JSON.parse(txDataString) as NearEthTxData;
         const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
         try {
-          await respondRequest(request, tx, nearTxHash, adapter!);
+          await adapter.beta.respondSessionRequest(
+            web3wallet,
+            request,
+            nearTxHash,
+            recovery
+          )
+          console.log("Responded request and cleared state")
           localStorage.removeItem("wc-request");
-          localStorage.removeItem("txData");
-          setTxData(undefined)
-          console.log()
+          localStorage.removeItem("recovery");
           router.replace(window.location.pathname);
         } catch (error) {
           console.error("Error responding to request:", error);
         }
+      } else {
+        console.warn(`Missing one of ${transactionHashes}, ${web3wallet} or ${adapter}`)
       }
     };
     handleRequestResponse();
-  }, [transactionHashes, txDataString, respondRequest, router, adapter, connectEvm]);
+  }, [web3wallet, initializeWallet, transactionHashes, router, adapter, connectEvm]);
 
   const rejectRequest = (request: Web3WalletTypes.SessionRequest): void => {
     if (!web3wallet) {
@@ -108,7 +116,7 @@ export const EthAdapter = () => {
       return;
     }
     localStorage.removeItem("wc-request");
-    localStorage.removeItem("txData");
+    localStorage.removeItem("recovery");
     setRequest(undefined);
     setTxData(undefined);
     web3wallet.respondSessionRequest({
@@ -163,9 +171,9 @@ export const EthAdapter = () => {
       </form>
       {txData && request && (
               <>
-                <div className="bg-gray-100 p-4 rounded shadow-md w-full max-w-xl">
+                <div className="bg-gray-900 p-4 rounded shadow-md w-full max-w-xl">
                   <h2 className="text-xl font-semibold mb-5">Transaction Data</h2>
-                  <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData, null, 2)}</pre>
+                  <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData.evmMessage, null, 2)}</pre>
                 </div>
                 <button
                   onClick={() => triggerNearTx(txData)}
