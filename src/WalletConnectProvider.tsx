@@ -4,7 +4,7 @@ import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
 import { NearEthTxData, NearEthAdapter, signatureFromTxHash, getNetworkId, configFromNetworkId } from "near-ca";
 import React, { createContext, useContext, useState } from "react";
-import { serializeTransaction } from "viem";
+import { Hex, serializeTransaction } from "viem";
 
 
 interface WalletContextType {
@@ -167,7 +167,7 @@ export const WalletConnectProvider = ({
         response: {
           id: request.id,
           jsonrpc: "2.0",
-          result: await adapter.beta.respondSessionRequest(txData.recoveryData, signature),
+          result: await adapter.beta.respondSessionRequest(signature, txData.recoveryData.data as Hex),
         },
       });
       console.log("Responded to request!");

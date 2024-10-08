@@ -3631,10 +3631,10 @@ near-api-js@^2.1.4:
     node-fetch "^2.6.1"
     tweetnacl "^1.0.1"
 
-near-ca@^0.3.0:
-  version "0.3.0"
-  resolved "https://registry.yarnpkg.com/near-ca/-/near-ca-0.3.0.tgz#006b2e28f395531e4801ff3affdc1f237b441b8c"
-  integrity sha512-J9yezQhV7rwQg2dwp0WGGkQwjZw4+HihbDhm5SA/jzBVhOL3p0nzSkkNPhuhtpmSn/snkMHPtPHPKePWWOhBLg==
+near-ca@^0.4.0:
+  version "0.4.2"
+  resolved "https://registry.yarnpkg.com/near-ca/-/near-ca-0.4.2.tgz#27d04c84799395a8d8ef8211446bc96d76247076"
+  integrity sha512-fsnLL6MFJXZByZ/h86KTIX5gQyFoZihz1QLa1W4NOY1vUgnvEERVeFHBvGP9BLdX41NleXb5GmXdLc35/bYhPA==
   dependencies:
     "@walletconnect/web3wallet" "^1.13.0"
     elliptic "^6.5.6"
