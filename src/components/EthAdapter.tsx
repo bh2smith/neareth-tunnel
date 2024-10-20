@@ -1,25 +1,26 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, Suspense } from "react";
 import { useMbWallet } from "@mintbase-js/react";
 import { Web3WalletTypes } from "@walletconnect/web3wallet";
 import { useWalletConnect } from "@/WalletConnectProvider";
 import { useRouter, useSearchParams } from "next/navigation";
-import { NearEthAdapter, NearEthTxData } from "near-ca";
+import {EncodedTxData, NearSafe, } from "near-safe";
 import { initializeAdapter } from "@/utils/adapter";
 
-export const EthAdapter = () => {
+const EthAdapter = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
   const transactionHashes = searchParams?.get('transactionHashes');
   const txDataString = searchParams?.get('txData');
   const [uri, setUri] = useState("");
-  const [txData, setTxData] = useState<NearEthTxData>();
+  const [txData, setTxData] = useState<EncodedTxData>();
   const [request, setRequest] = useState<Web3WalletTypes.SessionRequest>();
-  const [adapter, setAdapter] = useState<NearEthAdapter>();
+  const [adapter, setAdapter] = useState<NearSafe>();
   const { initializeWallet, web3wallet, handleRequest, onSessionProposal, respondRequest } = useWalletConnect();
+  console.log("Use Bitte")
   const { selector } = useMbWallet();
-
-  const triggerNearTx = useCallback(async (txData: NearEthTxData) => {
+  console.log("Got selector", selector)
+  const triggerNearTx = useCallback(async (txData: EncodedTxData) => {
     try {
       const wallet = await selector.wallet();
         console.log("Triggering Near Tx on wallet", txData, wallet);
@@ -85,7 +86,7 @@ export const EthAdapter = () => {
           console.error("one of txData or request is not in local storage!", requestString);
           return;
         }
-        const tx = JSON.parse(txDataString) as NearEthTxData;
+        const tx: EncodedTxData = JSON.parse(txDataString);
         const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
         try {
           await respondRequest(request, tx, nearTxHash, adapter!);
@@ -187,3 +188,12 @@ export const EthAdapter = () => {
     </div>
   );
 };
+
+
+export default function EthAdapterPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <EthAdapter />
+    </Suspense>
+  );
+}
