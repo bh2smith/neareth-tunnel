@@ -4,32 +4,44 @@ import { useMbWallet } from "@mintbase-js/react";
 import { Web3WalletTypes } from "@walletconnect/web3wallet";
 import { useWalletConnect } from "@/WalletConnectProvider";
 import { useRouter, useSearchParams } from "next/navigation";
-import {EncodedTxData, NearSafe, } from "near-safe";
+import { EncodedTxData, NearSafe } from "near-safe";
 import { initializeAdapter } from "@/utils/adapter";
 
 const EthAdapter = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const transactionHashes = searchParams?.get('transactionHashes');
-  const txDataString = searchParams?.get('txData');
+  const transactionHashes = searchParams?.get("transactionHashes");
+  const txDataString = searchParams?.get("txData");
   const [uri, setUri] = useState("");
   const [txData, setTxData] = useState<EncodedTxData>();
   const [request, setRequest] = useState<Web3WalletTypes.SessionRequest>();
   const [adapter, setAdapter] = useState<NearSafe>();
-  const { initializeWallet, web3wallet, handleRequest, onSessionProposal, respondRequest } = useWalletConnect();
+  const {
+    initializeWallet,
+    web3wallet,
+    handleRequest,
+    onSessionProposal,
+    respondRequest,
+  } = useWalletConnect();
   const { selector } = useMbWallet();
-  const triggerNearTx = useCallback(async (txData: EncodedTxData) => {
-    try {
-      const wallet = await selector.wallet();
+  const triggerNearTx = useCallback(
+    async (txData: EncodedTxData) => {
+      try {
+        const wallet = await selector.wallet();
         console.log("Triggering Near Tx on wallet", txData, wallet);
         wallet.signAndSendTransaction({
           ...txData.nearPayload,
-          callbackUrl: `http://localhost:3000?txData=${JSON.stringify(txData)}`
+          callbackUrl: `http://localhost:3000?txData=${JSON.stringify(txData)}`,
         });
-    } catch (err: unknown) {
-      console.error("Cannot connect to EVM without Near wallet connection!", (err as Error).message);
-    }
-  }, [selector]);
+      } catch (err: unknown) {
+        console.error(
+          "Cannot connect to EVM without Near wallet connection!",
+          (err as Error).message,
+        );
+      }
+    },
+    [selector],
+  );
 
   const connectEvm = useCallback(async () => {
     if (!selector) {
@@ -37,25 +49,29 @@ const EthAdapter = () => {
     }
     if (!adapter) {
       const adapter = await initializeAdapter(selector);
-      setAdapter(adapter)
+      setAdapter(adapter);
     }
   }, [adapter, selector]);
-  
+
   useEffect(() => {
     if (transactionHashes) {
       return;
     }
     if (web3wallet && adapter) {
-      const handleSessionProposal = async (request: Web3WalletTypes.SessionProposal) => {
+      const handleSessionProposal = async (
+        request: Web3WalletTypes.SessionProposal,
+      ) => {
         console.log("Received session_proposal");
         onSessionProposal(request, adapter!);
       };
-      const handleSessionRequest = async (request: Web3WalletTypes.SessionRequest) => {
+      const handleSessionRequest = async (
+        request: Web3WalletTypes.SessionRequest,
+      ) => {
         console.log("Received session_request", request);
         const txData = await handleRequest(request, adapter);
         localStorage.setItem("txData", JSON.stringify(txData));
-        setTxData(txData)
-        setRequest(request)
+        setTxData(txData);
+        setRequest(request);
         console.log("set txData in local storage and state");
       };
       web3wallet.on("session_proposal", handleSessionProposal);
@@ -65,7 +81,14 @@ const EthAdapter = () => {
         web3wallet.off("session_request", handleSessionRequest);
       };
     }
-  }, [web3wallet, handleRequest, onSessionProposal, triggerNearTx, adapter, transactionHashes]);
+  }, [
+    web3wallet,
+    handleRequest,
+    onSessionProposal,
+    triggerNearTx,
+    adapter,
+    transactionHashes,
+  ]);
 
   useEffect(() => {
     if (uri) localStorage.setItem("wc-uri", uri);
@@ -73,25 +96,32 @@ const EthAdapter = () => {
 
   useEffect(() => {
     const handleRequestResponse = async () => {
-      if (!adapter) { 
+      if (!adapter) {
         await connectEvm();
-      };
+      }
       if (transactionHashes && txDataString) {
-        const nearTxHash = Array.isArray(transactionHashes) ? transactionHashes[0] : transactionHashes;
-        console.log('Near Tx Hash from URL:', nearTxHash);
+        const nearTxHash = Array.isArray(transactionHashes)
+          ? transactionHashes[0]
+          : transactionHashes;
+        console.log("Near Tx Hash from URL:", nearTxHash);
         const requestString = localStorage.getItem("wc-request");
         if (!requestString) {
-          console.error("one of txData or request is not in local storage!", requestString);
+          console.error(
+            "one of txData or request is not in local storage!",
+            requestString,
+          );
           return;
         }
         const tx: EncodedTxData = JSON.parse(txDataString);
-        const request = JSON.parse(requestString) as Web3WalletTypes.SessionRequest;
+        const request = JSON.parse(
+          requestString,
+        ) as Web3WalletTypes.SessionRequest;
         try {
           await respondRequest(request, tx, nearTxHash, adapter!);
           localStorage.removeItem("wc-request");
           localStorage.removeItem("txData");
-          setTxData(undefined)
-          console.log()
+          setTxData(undefined);
+          console.log();
           router.replace(window.location.pathname);
         } catch (error) {
           console.error("Error responding to request:", error);
@@ -99,11 +129,20 @@ const EthAdapter = () => {
       }
     };
     handleRequestResponse();
-  }, [transactionHashes, txDataString, respondRequest, router, adapter, connectEvm]);
+  }, [
+    transactionHashes,
+    txDataString,
+    respondRequest,
+    router,
+    adapter,
+    connectEvm,
+  ]);
 
   const rejectRequest = (request: Web3WalletTypes.SessionRequest): void => {
     if (!web3wallet) {
-      console.warn("No web3wallet available: can not respond to session_proposal");
+      console.warn(
+        "No web3wallet available: can not respond to session_proposal",
+      );
       return;
     }
     localStorage.removeItem("wc-request");
@@ -114,21 +153,22 @@ const EthAdapter = () => {
       topic: request.topic,
       response: {
         id: request.id,
-        jsonrpc: '2.0',
+        jsonrpc: "2.0",
         error: {
           code: 5000,
-          message: 'User rejected.'
-        }
-      }
+          message: "User rejected.",
+        },
+      },
     });
   };
   return (
     <div className="mx-6 sm:mx-24 mt-4 mb-4">
       <div className="w-full flex flex-col justify-center items-center">
         <div className="w-full flex flex-col justify-center items-center space-y-8">
-          <h1 className="text-[40px]">Connect to Dapp via Wallet Connect Below</h1>
-          <div className="flex flex-col justify-center items-center space-y-4">
-          </div>
+          <h1 className="text-[40px]">
+            Connect to Dapp via Wallet Connect Below
+          </h1>
+          <div className="flex flex-col justify-center items-center space-y-4"></div>
           <div className="flex flex-col justify-center items-center space-y-4">
             <button
               onClick={connectEvm}
@@ -142,29 +182,33 @@ const EthAdapter = () => {
               </div>
             )}
           </div>
-          <div className='flex flex-col items-center'>
+          <div className="flex flex-col items-center">
             <form
-              className='flex flex-col items-center'
+              className="flex flex-col items-center"
               onSubmit={(e) => {
                 e.preventDefault(); // Prevent the default form submit behavior
                 initializeWallet(uri); // Use the URI from state when the form is submitted
               }}
             >
-            <input
-              type='text'
-              value={uri}
-              onChange={(e) => setUri(e.target.value)}
-              placeholder='Enter WalletConnect URI'
-              required // Makes sure the input is not empty
-              className='text-gray-800 p-2 rounded border border-gray-300'
-            />
-            <button type='submit'>Connect</button>
-      </form>
-      {txData && request && (
+              <input
+                type="text"
+                value={uri}
+                onChange={(e) => setUri(e.target.value)}
+                placeholder="Enter WalletConnect URI"
+                required // Makes sure the input is not empty
+                className="text-gray-800 p-2 rounded border border-gray-300"
+              />
+              <button type="submit">Connect</button>
+            </form>
+            {txData && request && (
               <>
                 <div className="bg-gray-100 p-4 rounded shadow-md w-full max-w-xl">
-                  <h2 className="text-xl font-semibold mb-5">Transaction Data</h2>
-                  <pre className="text-left whitespace-pre-wrap break-all">{JSON.stringify(txData, null, 2)}</pre>
+                  <h2 className="text-xl font-semibold mb-5">
+                    Transaction Data
+                  </h2>
+                  <pre className="text-left whitespace-pre-wrap break-all">
+                    {JSON.stringify(txData, null, 2)}
+                  </pre>
                 </div>
                 <button
                   onClick={() => triggerNearTx(txData)}
@@ -186,7 +230,6 @@ const EthAdapter = () => {
     </div>
   );
 };
-
 
 export default function EthAdapterPage() {
   return (
