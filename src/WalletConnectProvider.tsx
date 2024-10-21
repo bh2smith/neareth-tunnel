@@ -134,10 +134,10 @@ export const WalletConnectProvider = ({
     console.log("SessionRequest", JSON.stringify(request));
     const signRequest = {
       method: request.params.request.method, 
-      chainId: parseInt(request.params.chainId), 
+      chainId: parseInt(request.params.chainId.split(":")[1]), 
       params: request.params.request.params 
     } as SignRequestData;
-    return await adapter.encodeSignRequest(signRequest, process.env.SPONSORHIP_POLICY);
+    return await adapter.encodeSignRequest(signRequest, process.env.NEXT_PUBLIC_SPONSORHIP_POLICY);
   };
 
   const respondRequest = async (

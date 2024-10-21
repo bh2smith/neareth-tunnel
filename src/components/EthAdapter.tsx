@@ -17,9 +17,7 @@ const EthAdapter = () => {
   const [request, setRequest] = useState<Web3WalletTypes.SessionRequest>();
   const [adapter, setAdapter] = useState<NearSafe>();
   const { initializeWallet, web3wallet, handleRequest, onSessionProposal, respondRequest } = useWalletConnect();
-  console.log("Use Bitte")
   const { selector } = useMbWallet();
-  console.log("Got selector", selector)
   const triggerNearTx = useCallback(async (txData: EncodedTxData) => {
     try {
       const wallet = await selector.wallet();
