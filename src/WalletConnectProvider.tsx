@@ -2,23 +2,21 @@
 import { Core } from "@walletconnect/core";
 import { buildApprovedNamespaces } from "@walletconnect/utils";
 import { Web3Wallet, Web3WalletTypes } from "@walletconnect/web3wallet";
-import { NearEthTxData, NearEthAdapter, signatureFromTxHash, getNetworkId, configFromNetworkId } from "near-ca";
+import { EncodedTxData, NearSafe, signatureFromTxHash, SignRequestData } from "near-safe";
 import React, { createContext, useContext, useState } from "react";
-import { Hex, serializeTransaction } from "viem";
-
 
 interface WalletContextType {
   web3wallet: InstanceType<typeof Web3Wallet> | null;
   initializeWallet: (uri: string) => void;
-  handleRequest: (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter) => Promise<NearEthTxData | undefined>;
+  handleRequest: (request: Web3WalletTypes.SessionRequest, adapter: NearSafe) => Promise<EncodedTxData | undefined>;
   respondRequest: (
     request: Web3WalletTypes.SessionRequest,
-    txData: NearEthTxData,
+    txData: EncodedTxData,
     nearTxHash: string,
-    adapter: NearEthAdapter,
+    adapter: NearSafe,
   ) => Promise<void>;
   // rejectRequest: (request: Web3WalletTypes.SessionRequest) => void;
-  onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => void;
+  onSessionProposal: (request: Web3WalletTypes.SessionProposal, adapter: NearSafe) => void;
 }
 
 const WalletContext = createContext<WalletContextType | undefined>(undefined);
@@ -70,7 +68,7 @@ export const WalletConnectProvider = ({
     id,
     params, 
     // verifyContext,
-  }: Web3WalletTypes.SessionProposal, adapter: NearEthAdapter) => {
+  }: Web3WalletTypes.SessionProposal, adapter: NearSafe) => {
     if (!web3wallet) {
       console.warn("No web3wallet available: can not respond to session_proposal");
       return;
@@ -127,27 +125,26 @@ export const WalletConnectProvider = ({
     // web3wallet!.on("session_request", handleRequest);
   };
 
-  const handleRequest = async (request: Web3WalletTypes.SessionRequest, adapter: NearEthAdapter): Promise<NearEthTxData | undefined> => {
+  const handleRequest = async (request: Web3WalletTypes.SessionRequest, adapter: NearSafe): Promise<EncodedTxData | undefined> => {
     // set wc-request to storage (it will be lost after signing)
     localStorage.setItem("wc-request", JSON.stringify(request));
     if (!web3wallet) {
       console.error("handleRequest: web3wallet is undefined", web3wallet);
     }
     console.log("SessionRequest", JSON.stringify(request));
-    const txData = await adapter.beta.handleSessionRequest(request);
-    
-    // Can not stringify `bigint` primitive type.
-    if (!(typeof txData.evmMessage === "string")) {
-      txData.evmMessage = serializeTransaction(txData.evmMessage);
-    }
-    return txData;
+    const signRequest = {
+      method: request.params.request.method, 
+      chainId: parseInt(request.params.chainId.split(":")[1]), 
+      params: request.params.request.params 
+    } as SignRequestData;
+    return await adapter.encodeSignRequest(signRequest, process.env.NEXT_PUBLIC_SPONSORHIP_POLICY);
   };
 
   const respondRequest = async (
     request: Web3WalletTypes.SessionRequest, 
-    txData: NearEthTxData,
+    txData: EncodedTxData,
     nearTxHash: string,
-    adapter: NearEthAdapter,
+    adapter: NearSafe,
   ) => {
     console.log("Responding to request", request, nearTxHash);
     if (!web3wallet) {
@@ -155,24 +152,26 @@ export const WalletConnectProvider = ({
       await initializeWallet()
       console.warn("respondRequest: Should now be defined!", web3wallet);
     }
-    const nearConfig = configFromNetworkId(getNetworkId(adapter.nearAccountId()));
-    const signature = await signatureFromTxHash(
-      nearConfig.nodeUrl,      
-      nearTxHash
-    );
+    const signature = await signatureFromTxHash(nearTxHash);
+    const {chainId, data} = txData.evmData;
     console.log("retrieved signature from Near MPC Contract", signature);
+    const opHash = await adapter.executeTransaction(chainId, {
+      ...JSON.parse(data),
+      signature,
+  });
+    const txHash = await adapter.getOpReceipt(chainId, opHash)
     try {
       await web3wallet!.respondSessionRequest({
         topic: request.topic,
         response: {
           id: request.id,
           jsonrpc: "2.0",
-          result: await adapter.beta.respondSessionRequest(signature, txData.recoveryData.data as Hex),
+          result: txHash,
         },
       });
       console.log("Responded to request!");
     } catch (error: unknown) {
-      console.log()
+      console.log(error)
     }
     
   };

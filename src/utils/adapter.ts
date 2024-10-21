@@ -1,22 +1,24 @@
 import { WalletSelector } from "@near-wallet-selector/core";
-import {
-  NearEthAdapter,
-  setupAdapter,
-} from "near-ca";
+import { NearSafe } from "near-safe";
 
 export async function initializeAdapter(
   selector: WalletSelector,
-): Promise<NearEthAdapter | undefined> {
+): Promise<NearSafe | undefined> {
   try {
+    console.log("initializeAdapter")
     const nearWallet = await selector.wallet();
     const accounts = await nearWallet.getAccounts();  
     const accountId = accounts[0].accountId;
     const mpcContractId = process.env.NEXT_PUBLIC_NEAR_MULTICHAIN_CONTRACT!
+    const pimlicoKey = process.env.NEXT_PUBLIC_PIMLICO_KEY!;
+
     console.log(accountId, mpcContractId)
-    const adapter = await setupAdapter({accountId, mpcContractId});
-    console.log(`Instantiated adapter: ${adapter.nearAccountId()} <> ${adapter.address}`);
-    return adapter;
+    return NearSafe.create({
+      accountId,
+      mpcContractId,
+      pimlicoKey
+    })
   } catch (error: unknown) {
-    console.info(`can't build adapter ${error}`);
+    throw new Error(`can't build adapter ${error}`)
   }
 }
