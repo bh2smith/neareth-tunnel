@@ -22,7 +22,7 @@
     "fmt": "prettier src/ --write"
   },
   "dependencies": {
-    "@mintbase-js/react": "0.5.4-beta.0",
+    "@mintbase-js/react": "0.6.5",
     "near-safe": "^0.7.1",
     "next": "14.2.15",
     "pino-pretty": "^11.3.0",
